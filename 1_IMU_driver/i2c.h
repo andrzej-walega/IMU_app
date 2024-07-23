@@ -1,11 +1,13 @@
-#include <stdint.h>
 #ifndef I2C_H_
 #define I2C_H_
 
 #ifdef __cplusplus
-extern "C"
+    extern "C"
 {
 #endif
+
+#include <stdint.h>
+#include <stdbool.h>
 
     //************************************************************************************************
     // I2C Function prototypes for master
