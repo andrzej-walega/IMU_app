@@ -139,7 +139,8 @@ bool IMU_set_gyro_mode(uint8_t gyro_mode_reg_val)
     {
         start_timer();
         while (!time_elapsed(MAX_GYRO_MODE_WAIT_TIME_MSEC))
-        {}
+        {
+        }
         imu.gyro_mode = gyro_mode_reg_val;
         status = true;
     }
@@ -177,7 +178,8 @@ bool IMU_read_gyro_data(uint8_t *gyro_data)
     return IMU_read_data(GYRO_DATA_X1, gyro_data);
 }
 
-bool IMU_read_accel_data(uint8_t *accel_data){
+bool IMU_read_accel_data(uint8_t *accel_data)
+{
     return IMU_read_data(ACCEL_DATA_X1, accel_data);
 }
 
@@ -191,7 +193,8 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         return false;
     }
 
-    while (reading_bytes != 0){
+    while (reading_bytes != 0)
+    {
         start_timer();
         while (!IMU_is_data_ready())
         {
@@ -243,11 +246,6 @@ static bool IMU_send_I2C_reg_setting(uint8_t reg_addr, uint8_t reg_mask, uint8_t
 {
 
     uint8_t reg_value;
-
-    if (!imu.acquisition_started)
-    {
-        return false;
-    }
 
     if (!i2c_read_data(reg_addr, &reg_value))
     {
