@@ -6,6 +6,7 @@
 {
 #endif
 
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -49,21 +50,21 @@
 
     // writting a byte of data (const uint8_t *data) to I2C bus
     // return true if successful
-    bool i2c_write_data(uint8_t reg_addr, const uint8_t *data);
+    bool i2c_write_data(const uint8_t reg_addr, uint8_t * data);
 
     // writting series of data bytes started at *data to I2C bus
     // start_repeated is true if don't want to send stop bit between sending bytes
     // return true if successful
-    bool i2c_write_series(uint8_t reg_addr, const uint8_t *data, uint8_t length, bool start_repeated);
+    bool i2c_write_series(const uint8_t reg_addr, const uint8_t *data, uint8_t length, bool start_repeated);
 
     // reading a byte of data (uint8_t *data) from I2C bus
     // return true if successful
-    bool i2c_read_data(uint8_t reg_addr, uint8_t *data);
+    bool i2c_read_data(const uint8_t reg_addr, uint8_t * data);
 
     // reading series of data bytes started at *data from I2C bus
     // start_repeated is true if don't want to send stop bit between sending bytes
     // return true if successful
-    bool i2c_read_series(uint8_t reg_addr, uint8_t *data, uint8_t length, bool start_repeated);
+    bool i2c_read_series(const uint8_t reg_addr, uint8_t *data, uint8_t length, bool start_repeated);
 
     //************************************************************************************************
 

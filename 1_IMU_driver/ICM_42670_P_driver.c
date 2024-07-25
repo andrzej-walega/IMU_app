@@ -1,5 +1,7 @@
 
 #include <time.h>
+#include <stdio.h>
+#include <string.h>
 #include "ICM_42670_P_driver.h"
 
 static bool IMU_send_I2C_reg_setting(uint8_t reg_addr, uint8_t reg_mask, uint8_t reg_pos, uint8_t set_val);
@@ -62,7 +64,7 @@ bool IMU_stop_acquisition(void)
     return true;
 }
 
-bool IMU_set_gyro_freq(uint8_t gyro_freq_reg_val)
+bool IMU_set_gyro_freq(uint16_t gyro_freq_reg_val)
 {
     bool status = false;
 

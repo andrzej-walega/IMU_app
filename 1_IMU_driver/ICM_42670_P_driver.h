@@ -12,6 +12,8 @@ extern "C"
 #endif
 
 #include <stdbool.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "i2c.h"
 
 // Registers addresses
@@ -105,6 +107,12 @@ extern "C"
 #define MAX_GYRO_MODE_WAIT_TIME_MSEC 45UL
 #define MAX_ACCEL_MODE_WAIT_TIME_MSEC 1UL
 
+#define PIPE_CMD_NAME "/tmp/imu_cmd_pipe"
+#define PIPE_RESP_NAME "/tmp/imu_resp_pipe"
+#define SLAVE_OK "S,OK"
+#define SLAVE_ERR "S,ERR"
+#define RESPONSE_BUF_SIZE 255
+
     typedef struct
     {
         uint8_t address;
@@ -123,7 +131,7 @@ extern "C"
     bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t accel_freq, uint8_t accel_range);
     bool IMU_start_acquisition(void);
     bool IMU_stop_acquisition(void);
-    bool IMU_set_gyro_freq(uint8_t gyro_freq_reg_val);
+    bool IMU_set_gyro_freq(uint16_t gyro_freq_reg_val);
     bool IMU_set_gyro_range(uint8_t gyro_range_reg_val);
     bool IMU_set_gyro_mode(uint8_t gyro_mode_reg_val);
     bool IMU_read_gyro_data(uint8_t *gyro_data);
