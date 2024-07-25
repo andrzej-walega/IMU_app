@@ -147,6 +147,6 @@ extern "C"
 
 #ifdef __cplusplus
 }
-#endif /* End of CPP guard */
+#endif
 
 #endif /* IMU_DRIVER_H_ End of header guard */

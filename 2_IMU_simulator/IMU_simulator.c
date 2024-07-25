@@ -11,25 +11,6 @@
 
 static imu_simul_t imu;
 
-static bool IMU_sim_set_gyro_freq(uint8_t gyro_freq_reg_val);
-static bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val);
-static bool IMU_sim_set_gyro_mode(uint8_t gyro_mode_reg_val);
-static bool IMU_sim_read_gyro_data(uint8_t *gyro_data);
-static bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val);
-static bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val);
-static bool IMU_sim_set_accel_mode(uint8_t accel_mode_reg_val);
-static bool IMU_sim_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val);
-static bool IMU_sim_read_accel_data(uint8_t *accel_data);
-static bool IMU_sim_set_idle(uint8_t idle_val);
-static bool IMU_sim_read_data(uint8_t start_reg_addr, uint8_t *read_data);
-static void IMU_sim_set_data_ready(void);
-static void IMU_sim_clear_is_data_ready(void);
-static void process_command(const char *command, char *response);
-static void read_and_answer_command();
-static bool send_response(char response[]);
-static bool create_resp_pipe();
-static void close_resp_pipe();
-
 int main(int argc, char const *argv[])
 {
     if (!load_imu_data_from_csv("imu_data.csv"))
@@ -78,7 +59,6 @@ bool load_imu_data_from_csv(const char *filename)
 
     // Read the data into the imu.data
     fgets(line, sizeof(line), file); // Skip the header line
-    printf("%s\n", line);
     size_t index = 0;
     while (fgets(line, sizeof(line), file))
     {
@@ -87,11 +67,10 @@ bool load_imu_data_from_csv(const char *filename)
                &imu.data[index].gx, &imu.data[index].gy, &imu.data[index].gz);
         index++;
     }
-    printf("%s\n", line);
     index--;
-    printf("%f, %f, %f, %f, %f, %f \n",
-           imu.data[index].ax, imu.data[index].ay, imu.data[index].az,
-           imu.data[index].gx, imu.data[index].gy, imu.data[index].gz);
+    // printf("%f, %f, %f, %f, %f, %f \n",
+    //        imu.data[index].ax, imu.data[index].ay, imu.data[index].az,
+    //        imu.data[index].gx, imu.data[index].gy, imu.data[index].gz);
 
     fclose(file);
     free(imu.data);
@@ -287,7 +266,7 @@ bool handle_write_register(uint8_t reg_addr, uint8_t *data)
     return result;
 }
 
-static bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val)
+bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val)
 {
     uint16_t range_val = 0;
     imu.reg.gyro_config0 = gyro_range_reg_val;
@@ -313,7 +292,7 @@ static bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val)
+bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val)
 {
     uint16_t range_val = 0;
     imu.reg.accel_config0 = accel_range_reg_val;
@@ -339,7 +318,7 @@ static bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_gyro_freq(uint8_t gyro_freq_reg_val)
+bool IMU_sim_set_gyro_freq(uint8_t gyro_freq_reg_val)
 {
     uint16_t freq_val = 0;
     imu.reg.gyro_config0 = gyro_freq_reg_val;
@@ -376,7 +355,7 @@ static bool IMU_sim_set_gyro_freq(uint8_t gyro_freq_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val)
+bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val)
 {
     uint16_t freq_val = 0;
     imu.reg.accel_config0 = accel_freq_reg_val;
@@ -424,7 +403,7 @@ static bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_gyro_mode(uint8_t gyro_mode_reg_val)
+bool IMU_sim_set_gyro_mode(uint8_t gyro_mode_reg_val)
 {
     uint16_t gyro_mode_val = 0;
     imu.reg.pwr_mgmt0 = gyro_mode_reg_val;
@@ -446,7 +425,7 @@ static bool IMU_sim_set_gyro_mode(uint8_t gyro_mode_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_accel_mode(uint8_t accel_mode_reg_val)
+bool IMU_sim_set_accel_mode(uint8_t accel_mode_reg_val)
 {
     uint16_t accel_mode_val = 0;
     imu.reg.pwr_mgmt0 = accel_mode_reg_val;
@@ -469,32 +448,32 @@ static bool IMU_sim_set_accel_mode(uint8_t accel_mode_reg_val)
     return true;
 }
 
-static bool IMU_sim_set_accel_LP_clk(uint8_t reg_val)
+bool IMU_sim_set_accel_LP_clk(uint8_t reg_val)
 {
     imu.reg.pwr_mgmt0 = reg_val;
     return true;
 }
 
-static bool IMU_sim_set_idle(uint8_t reg_val)
+bool IMU_sim_set_idle(uint8_t reg_val)
 {
     imu.reg.pwr_mgmt0 = reg_val;
     return true;
 }
 
-static void IMU_sim_set_data_ready()
+void IMU_sim_set_data_ready()
 {
     imu.data_ready = true;
     imu.reg.int_status_drdy = 0x01;
 }
 
-static void IMU_sim_clear_is_data_ready()
+void IMU_sim_clear_is_data_ready()
 {
     imu.data_ready = false;
     imu.reg.int_status_drdy = 0x00;
     return;
 }
 
-static bool create_resp_pipe()
+bool create_resp_pipe()
 {
     if (mkfifo(PIPE_RESP_NAME, 0666) == -1)
     {
@@ -507,18 +486,18 @@ static bool create_resp_pipe()
     return true;
 }
 
-static void close_resp_pipe()
+void close_resp_pipe()
 {
     unlink(PIPE_RESP_NAME);
 }
 
-static void process_command(const char *command, char *response)
+void process_command(const char *command, char *response)
 {
     if (strncmp(command, "M,write,", 8) == 0)
     {
         unsigned int reg_addr, reg_val;
         sscanf(command + 8, "%02X,%02X", &reg_addr, &reg_val);
-        printf("Processing write command: RA=%02X, reg_val=%02X\n", reg_addr, reg_val);
+        // printf("Processing write command: RA=%02X, reg_val=%02X\n", reg_addr, reg_val);
 
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
         uint8_t reg_val_u8 = (uint8_t)reg_val;
@@ -535,7 +514,7 @@ static void process_command(const char *command, char *response)
     {
         unsigned int reg_addr;
         sscanf(command + 7, "%02X", &reg_addr);
-        printf("Processing read command: RA=%02X\n", reg_addr);
+        // printf("Processing read command: RA=%02X\n", reg_addr);
 
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
         uint8_t reg_val;
@@ -555,16 +534,16 @@ static void process_command(const char *command, char *response)
     send_response(response);
 }
 
-static void read_and_answer_command(){
+void read_and_answer_command(){
     char buffer[RESPONSE_BUF_SIZE];
     char response[RESPONSE_BUF_SIZE];
     int fd = open(PIPE_CMD_NAME, O_RDONLY);
-    if (fd == -1)
-    {
-        perror("open ");
-        return;
-    }
 
+    while (fd == -1)
+    {
+        fd = open(PIPE_CMD_NAME, O_RDONLY);
+        usleep(100000); // wait 100ms
+    }
     ssize_t bytesRead = read(fd, buffer, sizeof(buffer) - 1);
     if (bytesRead > 0)
     {
@@ -574,7 +553,7 @@ static void read_and_answer_command(){
     }
 }
 
-static bool send_response(char response[])
+bool send_response(char response[])
 {
     int fd = open(PIPE_RESP_NAME, O_WRONLY);
     if (fd == -1)
@@ -582,12 +561,8 @@ static bool send_response(char response[])
         perror("open resp pipe");
         return false;
     }
-    // write(fd, response, strlen(response) + 1);
     write(fd, response, strlen(response));
     close(fd);
+    printf("Sent response: %s\n", response);
     return true;
 }
-
-static bool IMU_sim_read_gyro_data(uint8_t *gyro_data);
-static bool IMU_sim_read_accel_data(uint8_t *accel_data);
-static bool IMU_sim_read_data(uint8_t start_reg_addr, uint8_t *read_data);

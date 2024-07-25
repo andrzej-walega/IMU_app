@@ -26,10 +26,10 @@ bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t ac
     imu.address = address;
     imu.gyro_freq = gyro_freq;
     imu.gyro_range = gyro_range;
-    imu.gyro_mode = 0; //TODO switch on the gyro
+    imu.gyro_mode = 0;
     imu.accel_freq = accel_freq;
     imu.accel_range = accel_range;
-    imu.accel_mode = 0; // TODO switch on the accel
+    imu.accel_mode = 0;
     imu.accel_LP_clk = 0;
     imu.idle = 0;
     imu.acquisition_started = false;

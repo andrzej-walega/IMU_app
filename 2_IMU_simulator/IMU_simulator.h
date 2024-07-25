@@ -55,6 +55,19 @@ extern "C"
         imu_registers_t reg;
     } imu_simul_t;
 
+    bool IMU_sim_set_gyro_freq(uint8_t gyro_freq_reg_val);
+    bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val);
+    bool IMU_sim_set_gyro_mode(uint8_t gyro_mode_reg_val);
+    bool IMU_sim_read_gyro_data(uint8_t *gyro_data);
+    bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val);
+    bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val);
+    bool IMU_sim_set_accel_mode(uint8_t accel_mode_reg_val);
+    bool IMU_sim_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val);
+    bool IMU_sim_read_accel_data(uint8_t *accel_data);
+    bool IMU_sim_set_idle(uint8_t idle_val);
+    bool IMU_sim_read_data(uint8_t start_reg_addr, uint8_t *read_data);
+    void IMU_sim_set_data_ready(void);
+    void IMU_sim_clear_is_data_ready(void);
     bool load_imu_data_from_csv(const char *filename);
     void get_accel_data_from_arr(uint32_t);
     void convert_float_to_gyro_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte);
@@ -63,9 +76,14 @@ extern "C"
     void update_gyro_data();
     bool handle_read_register(uint8_t reg_addr, uint8_t *reg_val);
     bool handle_write_register(uint8_t reg_addr, uint8_t *data);
+    void process_command(const char *command, char *response);
+    void read_and_answer_command();
+    bool send_response(char response[]);
+    bool create_resp_pipe();
+    void close_resp_pipe();
 
 #ifdef __cplusplus
 }
-#endif /* End of CPP guard */
+#endif
 
 #endif /* I2C_H_ End of header guard */

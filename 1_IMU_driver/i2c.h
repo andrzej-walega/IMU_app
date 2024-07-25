@@ -70,6 +70,6 @@
 
 #ifdef __cplusplus
 }
-#endif /* End of CPP guard */
+#endif
 
 #endif /* I2C_H_ End of header guard */
