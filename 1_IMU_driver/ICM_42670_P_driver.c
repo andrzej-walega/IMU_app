@@ -186,7 +186,7 @@ bool IMU_read_accel_data(uint8_t *accel_data)
 bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
 {
     uint8_t reading_bytes = 6; // 16-bit x y z
-    uint8_t reg_address = GYRO_DATA_X1;
+    uint8_t reg_address = start_reg_addr;
 
     if (!imu.acquisition_started)
     {

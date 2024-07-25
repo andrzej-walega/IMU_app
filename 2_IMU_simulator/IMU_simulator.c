@@ -575,6 +575,7 @@ bool send_response(char response[])
     if (fd == -1)
     {
         perror("open resp pipe");
+        close(fd);
         return false;
     }
     write(fd, response, strlen(response));
