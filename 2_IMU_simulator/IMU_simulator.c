@@ -13,6 +13,23 @@ static imu_simul_t imu;
 
 int main(int argc, char const *argv[])
 {
+    imu.reg.accel_data_x1 = 0x80;
+    imu.reg.accel_data_x0 = 0x00;
+    imu.reg.accel_data_y1 = 0x80;
+    imu.reg.accel_data_y0 = 0x00;
+    imu.reg.accel_data_z1 = 0x80;
+    imu.reg.accel_data_z0 = 0x00;
+    imu.reg.gyro_data_x1 = 0x80;
+    imu.reg.gyro_data_x0 = 0x00;
+    imu.reg.gyro_data_y1 = 0x80;
+    imu.reg.gyro_data_y0 = 0x00;
+    imu.reg.gyro_data_z1 = 0x80;
+    imu.reg.gyro_data_z0 = 0x00;
+    imu.reg.pwr_mgmt0 = 0x00;
+    imu.reg.gyro_config0 = 0x06;
+    imu.reg.accel_config0 = 0x06;
+    imu.reg.int_status_drdy = 0x00;
+
     if (!load_imu_data_from_csv("imu_data.csv"))
     {
         fprintf(stderr, "Failed to load IMU data from CSV file\n");
@@ -271,7 +288,7 @@ bool IMU_sim_set_gyro_range(uint8_t gyro_range_reg_val)
     uint16_t range_val = 0;
     imu.reg.gyro_config0 = gyro_range_reg_val;
     range_val = gyro_range_reg_val & GYRO_UI_FS_SEL_MASK;
-    range_val >> GYRO_UI_FS_SEL_POS;
+    range_val >>= GYRO_UI_FS_SEL_POS;
     switch (range_val)
     {
     case GYRO_UI_FS_SEL_2000DPS:
@@ -297,7 +314,7 @@ bool IMU_sim_set_accel_range(uint8_t accel_range_reg_val)
     uint16_t range_val = 0;
     imu.reg.accel_config0 = accel_range_reg_val;
     range_val = accel_range_reg_val & ACCEL_UI_FS_SEL_MASK;
-    range_val >> ACCEL_UI_FS_SEL_POS;
+    range_val >>= ACCEL_UI_FS_SEL_POS;
     switch (range_val)
     {
     case ACCEL_UI_FS_SEL_2G:
@@ -399,7 +416,6 @@ bool IMU_sim_set_accel_freq(uint8_t accel_freq_reg_val)
     default:
         return false;
     }
-
     return true;
 }
 

@@ -150,7 +150,7 @@ bool IMU_set_gyro_mode(uint8_t gyro_mode_reg_val)
 bool IMU_set_accel_mode(uint8_t accel_mode_reg_val)
 {
     bool status = false;
-    if (IMU_send_I2C_reg_setting(PWR_MGMT0, GYRO_MODE_MASK, GYRO_MODE_POS, accel_mode_reg_val))
+    if (IMU_send_I2C_reg_setting(PWR_MGMT0, ACCEL_MODE_MASK, ACCEL_MODE_POS, accel_mode_reg_val))
     {
         start_timer();
         while (!time_elapsed(MAX_ACCEL_MODE_WAIT_TIME_MSEC))
@@ -196,7 +196,7 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
     while (reading_bytes != 0)
     {
         start_timer();
-        while (!IMU_is_data_ready())
+        while (!IMU_is_data_ready()) // wait for data (INT_STATUS_DRDY)
         {
             if (time_elapsed(MAX_I2C_WAIT_TIME_MSEC))
             {
@@ -208,6 +208,7 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         {
             return false;
         }
+        printf("read_data reg_address, read_data, reading_bytes %d %d %d\n", reg_address, *read_data, reading_bytes);
         reg_address++;
         read_data++;
         reading_bytes--;

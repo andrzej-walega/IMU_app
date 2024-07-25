@@ -13,15 +13,17 @@ using namespace std;
 int main(int argc, char **argv)
 {
     // imu.init();
+    // Imu.freefall_init();
+    // imu.set_accel_range(ACCEL_UI_FS_SEL_2G);
+    // imu.set_gyro_range(GYRO_UI_FS_SEL_250DPS);
+    // imu.set_accel_freq(ACCEL_ODR_50HZ);
+    // imu.set_gyro_freq(GYRO_ODR_50HZ);
+    // imu.acquisition_started;
+    // imu.read_data();
+    // imu.set_freefall_threshold();
+    // imu_freefall_detect();
+
     create_cmd_pipe();
-    // uint8_t reg_addr = PWR_MGMT0;
-    // uint8_t reg_value = 0xA0;
-    // i2c_write_data(reg_addr, &reg_value);
-    // i2c_write_data(reg_addr, &reg_value);
-    // i2c_write_data(reg_addr, &reg_value);
-    // i2c_read_data(reg_addr, &reg_value);
-    // i2c_read_data(reg_addr, &reg_value);
-    // i2c_read_data(reg_addr, &reg_value);
 
     IMU_set_accel_range(ACCEL_UI_FS_SEL_2G);
     IMU_set_gyro_range(GYRO_UI_FS_SEL_250DPS);
@@ -29,6 +31,13 @@ int main(int argc, char **argv)
     IMU_set_gyro_freq(GYRO_ODR_50HZ);
     imu.acquisition_started = IMU_start_acquisition();
     cout << "acquisition_started" << imu.acquisition_started << endl;
+    uint8_t accel_data[6] = {0};
+    IMU_read_accel_data(accel_data);
+    cout << "accel_data" << accel_data[0] << endl;
+    cout << "accel_data" << accel_data[5] << endl;
+    IMU_read_accel_data(accel_data);
+    cout << "accel_data" << accel_data[0] << endl;
+    cout << "accel_data" << accel_data[5] << endl;
     unlink_cmd_pipe();
     // Main loop
     while (1)
