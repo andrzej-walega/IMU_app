@@ -8,8 +8,20 @@ extern "C"
 {
 #endif
 
-    bool create_cmd_pipe();
-    void unlink_cmd_pipe();
+// pipe for sending commands
+#define PIPE_CMD_NAME "/tmp/imu_cmd_pipe"
+// pipe for sending responses
+#define PIPE_RESP_NAME "/tmp/imu_resp_pipe"
+    
+#define I2C_EMUL_SHOW_COMMUNICATION 0 /* 1 => show*/
+#define GET_RESP_TIMEOUT 500 /* [ms] */
+
+#define SLAVE_OK "S,OK"
+#define SLAVE_ERR "S,ERR"
+
+    void ignore_sigpipe();
+    void create_pipes();
+    void close_pipes();
 
 #ifdef __cplusplus
 }

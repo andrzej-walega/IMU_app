@@ -11,6 +11,7 @@ extern "C"
 #include <stdbool.h>
 #include <stddef.h>
 #include "../1_IMU_driver/i2c.h"
+#include "../1_IMU_driver/i2c_emul.h"
 #include "../1_IMU_driver/ICM_42670_P_driver.h"
 
     typedef struct
@@ -69,18 +70,16 @@ extern "C"
     void IMU_sim_set_data_ready(void);
     void IMU_sim_clear_is_data_ready(void);
     bool load_imu_data_from_csv(const char *filename);
-    void get_accel_data_from_arr(uint32_t);
+    void get_data_from_arr(uint32_t);
     void convert_float_to_gyro_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte);
     void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte);
     void update_accel_data();
     void update_gyro_data();
     bool handle_read_register(uint8_t reg_addr, uint8_t *reg_val);
     bool handle_write_register(uint8_t reg_addr, uint8_t *data);
-    void process_command(const char *command, char *response);
-    void read_and_answer_command();
-    bool send_response(char response[]);
-    bool create_resp_pipe();
-    void close_resp_pipe();
+    void process_command();
+    bool read_and_answer_command();
+    bool send_response();
 
 #ifdef __cplusplus
 }

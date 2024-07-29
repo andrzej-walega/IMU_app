@@ -3,16 +3,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
+#include <poll.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include "IMU_simulator.h"
 
 static imu_simul_t imu;
 
-int main(int argc, char const *argv[])
-{
+static int fd_cmd, fd_resp;
+static bool is_new_cmd_data = false;
+static bool is_new_resp_data = false;
+
+static char cmd_buffer[I2C_BUF_SIZE];
+static char resp_buffer[I2C_BUF_SIZE];
+
+static void imu_init() {
     imu.reg.accel_data_x1 = 0x80;
     imu.reg.accel_data_x0 = 0x00;
     imu.reg.accel_data_y1 = 0x80;
@@ -29,19 +38,25 @@ int main(int argc, char const *argv[])
     imu.reg.gyro_config0 = 0x06;
     imu.reg.accel_config0 = 0x06;
     imu.reg.int_status_drdy = 0x00;
+}
 
+int main(int argc, char const* argv[])
+{
+    imu_init();
     if (!load_imu_data_from_csv("imu_data.csv"))
     {
         fprintf(stderr, "Failed to load IMU data from CSV file\n");
         return 1;
     }
-    create_resp_pipe();
-    while(1){
+    create_pipes();
+    //ignore SIGPIPE to not bloking the application at communication timeout
+    ignore_sigpipe();
+
+    while (1) {
         update_accel_data();
         update_gyro_data();
         read_and_answer_command();
     }
-    close_resp_pipe();
     return 0;
 }
 
@@ -51,7 +66,7 @@ bool load_imu_data_from_csv(const char *filename)
     if (!file)
     {
         perror("Failed to open file");
-        return false;
+        exit(EXIT_FAILURE);
     }
 
     // Count the number of lines in the file
@@ -69,7 +84,7 @@ bool load_imu_data_from_csv(const char *filename)
     {
         perror("Failed to allocate memory");
         fclose(file);
-        return false;
+        exit(EXIT_FAILURE);
     }
     imu.data_length = line_count;
     imu.current_index = 0;
@@ -94,7 +109,7 @@ bool load_imu_data_from_csv(const char *filename)
     return true;
 }
 
-void get_accel_data_from_arr(uint32_t line_index)
+void get_data_from_arr(uint32_t line_index)
 {
     uint8_t axis_number = 3; // x, y, z
     uint8_t *reg_data = &imu.reg.accel_data_x0;
@@ -103,7 +118,7 @@ void get_accel_data_from_arr(uint32_t line_index)
     for (uint8_t i = 0; i < axis_number; i++)
     {
         convert_float_to_accel_reg_data(*arr_data, reg_data+1, reg_data);
-        reg_data + 2;
+        reg_data += 2;
         arr_data++;
     }
 }
@@ -179,7 +194,7 @@ void update_accel_data(void)
         if (current_time - start_accel_time >= 1000/imu.accel_freq) //[ms/Hz]
         {
             start_accel_time = current_time;
-            get_accel_data_from_arr(accel_line_index);
+            get_data_from_arr(accel_line_index);
             IMU_sim_set_data_ready();
         }
     }
@@ -193,8 +208,29 @@ void update_accel_data(void)
     }
 }
 
-void update_gyro_data(){
+void update_gyro_data(void)
+{
+    static uint32_t gyro_line_index = 0;
+    static clock_t start_gyro_time = 0;
 
+    if (imu.gyro_on)
+    {
+        clock_t current_time = clock();
+        if (current_time - start_gyro_time >= 1000 / imu.gyro_freq) //[ms/Hz]
+        {
+            start_gyro_time = current_time;
+            get_data_from_arr(gyro_line_index);
+            IMU_sim_set_data_ready();
+        }
+    }
+    if (gyro_line_index >= imu.data_length - 1)
+    {
+        gyro_line_index = 0;
+    }
+    else
+    {
+        gyro_line_index++;
+    }
 }
 
 bool handle_read_register(uint8_t reg_addr, uint8_t *data)
@@ -489,97 +525,116 @@ void IMU_sim_clear_is_data_ready()
     return;
 }
 
-bool create_resp_pipe()
-{
-    if (mkfifo(PIPE_RESP_NAME, 0666) == -1)
+bool read_and_answer_command() {
+    // Read from the internal pipe
+    int fd = open(PIPE_CMD_NAME, O_RDONLY | O_NONBLOCK);
+    if (fd == -1)
     {
-        if (errno != EEXIST)
-        {
-            perror("mkfifo response pipe");
-            return false;
-        }
+        perror("open response pipe");
+        return false;
     }
+
+    struct pollfd fds;
+    fds.fd = fd;
+    fds.events = POLLIN;
+
+    // Poll for data with a timeout
+    int ret = poll(&fds, 1, GET_RESP_TIMEOUT);
+    if (ret == -1) {
+        perror("poll error");
+        close(fd);
+        return false;
+    }
+    else if (ret == 0) {
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        fprintf(stderr, "poll timeout\n");
+#endif
+        close(fd);
+        return false;
+    }
+
+    ssize_t bytesRead = read(fd, cmd_buffer, sizeof(cmd_buffer) - 1);
+    if (bytesRead > 0)
+    {
+        cmd_buffer[bytesRead] = '\0'; // terminate the string
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Received command: %s\n", cmd_buffer);
+#endif
+        process_command();
+    }
+    else if (bytesRead == -1) {
+        perror("read error");
+    }
+
+    close(fd);
     return true;
 }
 
-void close_resp_pipe()
+void process_command()
 {
-    unlink(PIPE_RESP_NAME);
-}
-
-void process_command(const char *command, char *response)
-{
-    if (strncmp(command, "M,write,", 8) == 0)
+    if (strncmp(cmd_buffer, "M,write,", 8) == 0) // processing write command
     {
         unsigned int reg_addr, reg_val;
-        sscanf(command + 8, "%02X,%02X", &reg_addr, &reg_val);
-        // printf("Processing write command: RA=%02X, reg_val=%02X\n", reg_addr, reg_val);
-
+        sscanf(cmd_buffer + 8, "%02X,%02X", &reg_addr, &reg_val);
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Processing write command: RA=%02X, reg_val=%02X\n", reg_addr, reg_val);
+#endif
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
         uint8_t reg_val_u8 = (uint8_t)reg_val;
 
         if (handle_write_register(reg_addr, &reg_val_u8))
         {
-            snprintf(response, RESPONSE_BUF_SIZE, "S,OK");
+            snprintf(resp_buffer, sizeof(resp_buffer), "S,OK");
         }
-        else{
-            snprintf(response, RESPONSE_BUF_SIZE, "S,ERR");
+        else {
+            snprintf(resp_buffer, sizeof(resp_buffer), "S,ERR");
         }
     }
-    else if (strncmp(command, "M,read,", 7) == 0)
+    else if (strncmp(cmd_buffer, "M,read,", 7) == 0) // processing read command
     {
         unsigned int reg_addr;
-        sscanf(command + 7, "%02X", &reg_addr);
-        // printf("Processing read command: RA=%02X\n", reg_addr);
-
+        sscanf(cmd_buffer + 7, "%02X", &reg_addr);
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Processing read command: RA=%02X\n", reg_addr);
+#endif
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
         uint8_t reg_val;
         if (handle_read_register(reg_addr, &reg_val))
         {
-            snprintf(response, RESPONSE_BUF_SIZE, "S,%02X", reg_val);
+            snprintf(resp_buffer, sizeof(resp_buffer), "S,%02X", reg_val);
         }
         else
         {
-            snprintf(response, RESPONSE_BUF_SIZE, "S,ERR");
+            snprintf(resp_buffer, sizeof(resp_buffer), "S,ERR");
         }
     }
     else
     {
-        snprintf(response, RESPONSE_BUF_SIZE, "S,ERR");
+        snprintf(resp_buffer, sizeof(resp_buffer), "S,ERR");
     }
-    send_response(response);
+    send_response(resp_buffer);
 }
 
-void read_and_answer_command(){
-    char buffer[RESPONSE_BUF_SIZE];
-    char response[RESPONSE_BUF_SIZE];
-    int fd = open(PIPE_CMD_NAME, O_RDONLY);
-
-    while (fd == -1)
-    {
-        fd = open(PIPE_CMD_NAME, O_RDONLY);
-        usleep(100000); // wait 100ms
-    }
-    ssize_t bytesRead = read(fd, buffer, sizeof(buffer) - 1);
-    if (bytesRead > 0)
-    {
-        buffer[bytesRead] = '\0'; // terminate the string
-        printf("Received command: %s\n", buffer);
-        process_command(buffer, response);
-    }
-}
-
-bool send_response(char response[])
+bool send_response()
 {
     int fd = open(PIPE_RESP_NAME, O_WRONLY);
     if (fd == -1)
     {
         perror("open resp pipe");
-        close(fd);
         return false;
     }
-    write(fd, response, strlen(response));
+    ssize_t bytes_written = write(fd, resp_buffer, sizeof(resp_buffer));
+    if (bytes_written == -1) {
+        if (errno == EPIPE) {
+            fprintf(stderr, "Broken pipe: Reader process is not available\n");
+        }
+        else {
+            perror("write");
+        }
+    }
     close(fd);
-    printf("Sent response: %s\n", response);
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+    printf("Response sent: %s\n", resp_buffer);
+#endif
     return true;
 }
