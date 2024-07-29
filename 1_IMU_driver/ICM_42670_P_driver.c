@@ -21,7 +21,10 @@ static bool time_elapsed(clock_t timeout_msec)
 }
 
 // Function implementations
-bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t accel_freq, uint8_t accel_range)
+
+//retval bool: communication ok, returned data is valid
+bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t accel_freq, uint8_t accel_range,
+    uint8_t i2c_sdl, uint8_t i2c_sdc, uint8_t i2c_hz)
 {
     imu.address = address;
     imu.gyro_freq = gyro_freq;
@@ -34,6 +37,7 @@ bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t ac
     imu.idle = 0;
     imu.acquisition_started = false;
     imu.data_ready = false;
+    return i2c_init(i2c_sdl, i2c_sdc, i2c_hz);
 }
 
 bool IMU_start_acquisition(void)
@@ -200,6 +204,7 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         {
             if (time_elapsed(MAX_I2C_WAIT_TIME_MSEC))
             {
+                printf("IMU: Communication broken, IMU need to be reset!\n");
                 return false;
             }
         }
@@ -208,11 +213,12 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         {
             return false;
         }
-        printf("read_data reg_address, read_data, reading_bytes %d %d %d\n", reg_address, *read_data, reading_bytes);
+        // printf("read_data reg_address, read_data, reading_bytes %d %d %d\n", reg_address, *read_data, reading_bytes);
         reg_address++;
         read_data++;
         reading_bytes--;
     }
+    return true;
 }
 
 bool IMU_set_idle(uint8_t idle_val)
@@ -243,6 +249,7 @@ bool IMU_is_data_ready(void)
     return imu.data_ready;
 }
 
+//retval bool: IMU communication is ok, returned data is valid
 static bool IMU_send_I2C_reg_setting(uint8_t reg_addr, uint8_t reg_mask, uint8_t reg_pos, uint8_t set_val)
 {
 

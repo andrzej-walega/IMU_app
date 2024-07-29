@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <poll.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -10,117 +12,176 @@
 #include "i2c.h"
 #include "ICM_42670_P_driver.h"
 
-static bool get_response(char *response, size_t size, uint8_t *ret_val);
-static bool process_response(char* response, uint8_t* ret_val);
+static char response[I2C_BUF_SIZE];
+static bool is_cmd_to_repeat = false;
+
+static bool send_command(const uint8_t reg_addr, uint8_t* send_reg_val);
+static bool get_and_process_response(uint8_t* rcv_reg_val);
+static bool process_response(uint8_t* rcv_reg_val);
+
+void ignore_sigpipe() {
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGPIPE, &sa, NULL);
+}
 
 bool i2c_init(uint8_t sda, uint8_t scl, uint8_t hz)
 {
+    create_pipes();
+    //ignore SIGPIPE to not bloking the application at communication timeout
+    ignore_sigpipe();
+    
     return true;
 }
 
 bool i2c_write_data(const uint8_t reg_addr, uint8_t* send_reg_val)
 {
-    uint8_t command_size = 50;
-    char write_command[command_size];
-    char response[RESPONSE_BUF_SIZE];
-    snprintf(write_command, sizeof(write_command), "M,write,%02X,%02X", reg_addr, *send_reg_val);
-    printf("Sending write command: %s\n", write_command);
-    int fd_cmd = open(PIPE_CMD_NAME, O_WRONLY);
-    // if (fd_cmd == -1)
-    // {
-    //     perror("open");
-    //     return false;
-    // }
-    write(fd_cmd, write_command, strlen(write_command) + 1);
-    get_response(response, RESPONSE_BUF_SIZE, NULL);
-    close(fd_cmd);
+    uint8_t* rcv_reg_val = NULL;
+
+    do{
+        send_command(reg_addr, send_reg_val);
+        get_and_process_response(rcv_reg_val);
+    } while (is_cmd_to_repeat);
+    
     return true;
 }
 
 bool i2c_read_data(const uint8_t reg_addr, uint8_t* rcv_reg_val)
 {
-    uint8_t command_size = 50;
-    char read_command[command_size];
-    char response[RESPONSE_BUF_SIZE];
-    snprintf(read_command, sizeof(read_command), "M,read,%02X", reg_addr);
+    uint8_t* send_reg_val = NULL;
 
-    printf("Sending read command: %s\n", read_command);
-    int fd = open(PIPE_CMD_NAME, O_WRONLY);
-    if (fd == -1)
+    do{
+        send_command(reg_addr, send_reg_val);
+        get_and_process_response(rcv_reg_val);
+    } while (is_cmd_to_repeat);
+
+    return true;
+}
+
+static bool send_command(const uint8_t reg_addr, uint8_t* send_reg_val) {
+    char write_command[I2C_BUF_SIZE];
+    if (send_reg_val == NULL) {
+        snprintf(write_command, sizeof(write_command), "M,read,%02X", reg_addr);
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Sending read command: %s", write_command);
+#endif
+    }
+    else {
+        snprintf(write_command, sizeof(write_command), "M,write,%02X,%02X", reg_addr, *send_reg_val);
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Write command sent: %s", write_command);
+#endif
+    }
+    int fd_cmd = open(PIPE_CMD_NAME, O_WRONLY);
+    if (fd_cmd == -1)
     {
         perror("open cmd pipe");
-        while (fd == -1)
-        {
-            fd = open(PIPE_CMD_NAME, O_WRONLY);
-            usleep(100000); // wait 100ms
-        }
         return false;
     }
-    write(fd, read_command, strlen(read_command) + 1);
-    get_response(response, RESPONSE_BUF_SIZE, rcv_reg_val);
+    ssize_t bytes_written = write(fd_cmd, write_command, strlen(write_command) + 1);
+    if (bytes_written == -1) {
+        if (errno == EPIPE) {
+            fprintf(stderr, "Broken pipe: Reader process is not available\n");
+        }
+        else {
+            perror("write");
+        }
+    }
+    printf(" ...ok\n");
+    close(fd_cmd);
+    return true;
+}
+
+
+static bool get_and_process_response(uint8_t* rcv_reg_val)
+{
+    // Read from the internal pipe
+    int fd = open(PIPE_RESP_NAME, O_RDONLY | O_NONBLOCK);
+    if (fd == -1) {
+        perror("open response pipe");
+        return false;
+    }
+
+    struct pollfd fds;
+    fds.fd = fd;
+    fds.events = POLLIN;
+
+    // Poll for data with a timeout
+    int ret = poll(&fds, 1, GET_RESP_TIMEOUT);
+    if (ret == -1) {
+        perror("poll error");
+        is_cmd_to_repeat = true;
+        close(fd);
+        return false;
+    }
+    else if (ret == 0) {
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        fprintf(stderr, "poll timeout\n");
+#endif
+        is_cmd_to_repeat = true;
+        close(fd);
+        return false;
+    }
+    is_cmd_to_repeat = false;
+    // If poll is successful, read from the pipe
+    ssize_t bytesRead = read(fd, response, I2C_BUF_SIZE - 1);
+    if (bytesRead > 0) {
+        response[bytesRead] = '\0'; // Terminate the string
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+        printf("Received response: %s\n", response);
+#endif
+        process_response(rcv_reg_val);
+    }
+    else if (bytesRead == -1) {
+        is_cmd_to_repeat = true;
+        perror("read error");
+    }
+
     close(fd);
     return true;
 }
 
-static bool process_response(char *response, uint8_t *rcv_reg_val)
+static bool process_response(uint8_t* rcv_reg_val)
 {
     if (strncmp(response, SLAVE_OK, 4) == 0)
     {
-        // printf("Operation successful\n");
+        is_cmd_to_repeat = false;
     }
     else if (strncmp(response, SLAVE_ERR, 5) == 0)
     {
-        // printf("Operation failed\n");
+        is_cmd_to_repeat = true;
     }
-    else if (response[0] == 'S' && response[1] == ',')
+    else if (response[0] == 'S' && response[1] == ',' && rcv_reg_val != NULL)
     {
         unsigned int reg_val;
         sscanf(response + 2, "%02X", &reg_val);
         *rcv_reg_val = (uint8_t)reg_val;
-        // printf("Received data: %02X\n", *rcv_reg_val);
+        is_cmd_to_repeat = false;
     }
 }
 
-static bool get_response(char response[], size_t size_response, uint8_t *rcv_reg_val)
-{
-    int fd = open(PIPE_RESP_NAME, O_RDONLY);
-    if (fd == -1)
-    {
-        perror("open response pipe");
-        // while (fd == -1)
-        // {
-        //     fd = open(PIPE_RESP_NAME, O_RDONLY);
-        //     usleep(100000); // wait 100ms
-        // }
-        return false;
-    }
-
-    size_t bytesRead = read(fd, response, size_response - 1);
-    if (bytesRead > 0)
-    {
-        response[bytesRead] = '\0'; // terminate the string
-        printf("Received response: %s\n", response);
-        process_response(response, rcv_reg_val);
-    }
-
-    close(fd);
-    return true;
-}
-
-bool create_cmd_pipe()
+void create_pipes()
 {
     if (mkfifo(PIPE_CMD_NAME, 0666) == -1)
     {
         if (errno != EEXIST)
         {
-            perror("mkfifo command pipe");
-            return false;
+            perror("mkfifo response pipe");
         }
     }
-    return true;
+    if (mkfifo(PIPE_RESP_NAME, 0666) == -1)
+    {
+        if (errno != EEXIST)
+        {
+            perror("mkfifo response pipe");
+        }
+    }
 }
 
-void unlink_cmd_pipe()
+void close_pipes()
 {
     unlink(PIPE_CMD_NAME);
+    unlink(PIPE_RESP_NAME);
 }
