@@ -17,13 +17,13 @@ public:
 
     bool setAccelFreq(uint16_t accelFreqRegVal);
     bool setAccelRange(uint8_t accelRangeRegVal);
-    bool readAccelData(std::vector<uint8_t>& accelData);
-    void showAccelData(const std::vector<uint8_t>& accelData);
+    bool readAccelData(std::vector<double>& accelData);
+    void showAccelData(const std::vector<double>& accelData);
 
     bool setGyroFreq(uint16_t gyroFreqRegVal);
     bool setGyroRange(uint16_t gyroRangeRegVal);
-    bool readGyroData(std::vector<uint8_t>& gyroData);
-    void showGyroData(const std::vector<uint8_t>& gyroData);
+    bool readGyroData(std::vector<double>& gyroData);
+    void showGyroData(const std::vector<double>& gyroData);
 
 private:
     uint8_t address_;
@@ -31,8 +31,8 @@ private:
     uint8_t accelRange_;
     uint16_t gyroFreq_;
     uint16_t gyroRange_;
-    std::vector<uint8_t> accelData_;
-    std::vector<uint8_t> gyroData_;
+    std::vector<double> accelData_;
+    std::vector<double> gyroData_;
     bool initialized_;
     bool acquisitionStarted_;
     bool dataReady_;

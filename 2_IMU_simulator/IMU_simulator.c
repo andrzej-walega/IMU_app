@@ -21,7 +21,7 @@ static bool is_new_resp_data = false;
 static char cmd_buffer[I2C_BUF_SIZE];
 static char resp_buffer[I2C_BUF_SIZE];
 
-// setting default reset values of ICM-42670-P
+// set default reset values of ICM-42670-P
 static void imu_init() {
     imu.reg.accel_data_x1 = 0x80;
     imu.reg.accel_data_x0 = 0x00;
@@ -67,6 +67,7 @@ int main(int argc, char const* argv[])
         update_gyro_data();
         read_and_answer_command();
     }
+    free(imu.data);
     return 0;
 }
 
@@ -103,53 +104,63 @@ bool load_imu_data_from_csv(const char *filename)
     size_t index = 0;
     while (fgets(line, sizeof(line), file))
     {
-        sscanf(line, "%f,%f,%f,%f,%f,%f",
+        sscanf(line, "%lf,%lf,%lf,%lf,%lf,%lf",
                &imu.data[index].ax, &imu.data[index].ay, &imu.data[index].az,
                &imu.data[index].gx, &imu.data[index].gy, &imu.data[index].gz);
         index++;
     }
     // index--;
-    // printf("%f, %f, %f, %f, %f, %f \n",
+    // printf("%lf, %lf, %lf, %lf, %lf, %lf\n",
     //        imu.data[index].ax, imu.data[index].ay, imu.data[index].az,
     //        imu.data[index].gx, imu.data[index].gy, imu.data[index].gz);
 
     fclose(file);
-    free(imu.data);
     return true;
 }
 
-void get_data_from_arr(uint32_t line_index)
+void get_data_from_arr(uint8_t start_addr, uint32_t line_index)
 {
     uint8_t axis_number = 3; // x, y, z
-    uint8_t *reg_data = &imu.reg.accel_data_x0;
-    float* arr_data = &imu.data[line_index].ax;
-
+    double* arr_data = NULL;
+    uint8_t* reg_data = NULL;
+    if (start_addr == ACCEL_DATA_X1) {
+        arr_data = &imu.data[line_index].ax;
+        reg_data = &imu.reg.accel_data_x1;
+    }
+    else if (start_addr == GYRO_DATA_X1){
+        arr_data = &imu.data[line_index].gx;
+        reg_data = &imu.reg.gyro_data_x1;
+    }
     for (uint8_t i = 0; i < axis_number; i++)
     {
-        convert_float_to_accel_reg_data(*arr_data, reg_data+1, reg_data);
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
+        printf("arr_data[%d]: %f\n", i, *arr_data);
+#endif
+        convert_double_to_accel_reg_data(*arr_data, reg_data, reg_data + 1);
         reg_data += 2;
         arr_data++;
     }
 }
 
-void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte)
+void convert_double_to_accel_reg_data(double value, uint8_t* high_byte, uint8_t* low_byte)
 {
     int16_t scaled_value;
-    float scaling_factor;
+    double scaling_factor;
 
     switch (imu.accel_range)
     {
     case 2:
-        scaling_factor = 8192.0; // 2^13 / 2G
+        scaling_factor = 16384.0; // 2^15 / 2G
         break;
     case 4:
+        scaling_factor = 8192.0;
+        break;
+
+    case 8:
         scaling_factor = 4096.0;
         break;
-    case 8:
-        scaling_factor = 2048.0;
-        break;
     case 16:
-        scaling_factor = 1024.0;
+        scaling_factor = 2048.0;
         break;
     default:
         *high_byte = 0x80;
@@ -162,15 +173,15 @@ void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *l
     *low_byte = scaled_value & 0xFF;
 }
 
-void convert_float_to_gyro_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte)
+void convert_double_to_gyro_reg_data(double value, uint8_t *high_byte, uint8_t *low_byte)
 {
     int16_t scaled_value;
-    float scaling_factor;
+    double scaling_factor;
 
     switch (imu.gyro_range)
     {
     case 250:
-        scaling_factor = 131.0; // 2^15 / 250DPS
+        scaling_factor = 131.1; // 2^15 / 250DPS
         break;
     case 500:
         scaling_factor = 65.5;
@@ -207,7 +218,7 @@ void update_accel_data(void)
         if (current_time - start_accel_time >= 1000 / imu.accel_freq) //[ms/Hz]
         {
             start_accel_time = current_time;
-            get_data_from_arr(accel_line_index);
+            get_data_from_arr(ACCEL_DATA_X1, accel_line_index);
             IMU_sim_set_data_ready();
         }
     }
@@ -236,7 +247,7 @@ void update_gyro_data(void)
         if (current_time - start_gyro_time >= 1000 / imu.gyro_freq) //[ms/Hz]
         {
             start_gyro_time = current_time;
-            get_data_from_arr(gyro_line_index);
+            get_data_from_arr(GYRO_DATA_X1, gyro_line_index);
             IMU_sim_set_data_ready();
         }
     }

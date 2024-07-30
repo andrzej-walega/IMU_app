@@ -275,15 +275,91 @@ bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val)
     return status;
 }
 
-bool IMU_read_gyro_data(uint8_t *gyro_data)
+// bool IMU_read_gyro_data(uint8_t *gyro_data)
+// {
+//     return IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE);
+// }
+
+// bool IMU_read_accel_data(uint8_t *accel_data)
+// {
+//     return IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE);
+// }
+
+bool IMU_read_gyro_data(double* gx, double* gy, double* gz)
 {
-    return IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE);
+    uint8_t gyro_data[GYRO_DATA_SIZE];
+
+    if (!IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE)) {
+        return false;
+    }
+
+    int16_t x_raw = (gyro_data[0] << 8) | gyro_data[1];
+    int16_t y_raw = (gyro_data[2] << 8) | gyro_data[3];
+    int16_t z_raw = (gyro_data[4] << 8) | gyro_data[5];
+
+    double scaling_factor;
+    switch (imu.gyro_range) {
+    case 250:
+        scaling_factor = 131.0; // 2^15 / 250DPS
+        break;
+    case 500:
+        scaling_factor = 65.5;
+        break;
+    case 1000:
+        scaling_factor = 32.8;
+        break;
+    case 2000:
+        scaling_factor = 16.4;
+        break;
+    default:
+        return false;
+    }
+
+    *gx = x_raw / scaling_factor;
+    *gy = y_raw / scaling_factor;
+    *gz = z_raw / scaling_factor;
+
+    return true;
 }
 
-bool IMU_read_accel_data(uint8_t *accel_data)
+
+bool IMU_read_accel_data(double* ax, double* ay, double* az)
 {
-    return IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE);
+    uint8_t accel_data[ACCEL_DATA_SIZE];
+
+    if (!IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE)) {
+        return false;
+    }
+
+    int16_t x_raw = (accel_data[0] << 8) | accel_data[1];
+    int16_t y_raw = (accel_data[2] << 8) | accel_data[3];
+    int16_t z_raw = (accel_data[4] << 8) | accel_data[5];
+
+    double scaling_factor;
+    switch (imu.accel_range) {
+    case 2:
+        scaling_factor = 16384.0; // 2^15 / 2G
+        break;
+    case 4:
+        scaling_factor = 8192.0;
+        break;
+    case 8:
+        scaling_factor = 4096.0;
+        break;
+    case 16:
+        scaling_factor = 2048.0;
+        break;
+    default:
+        return false;
+    }
+
+    *ax = x_raw / scaling_factor;
+    *ay = y_raw / scaling_factor;
+    *az = z_raw / scaling_factor;
+
+    return true;
 }
+
 
 bool IMU_read_data(uint8_t start_reg_addr, uint8_t* read_data, size_t length)
 {

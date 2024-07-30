@@ -2,6 +2,9 @@
 #include "IMU_main.h"
 // #include "../3_IMU_freefall/IMU_freefall.h"
 
+constexpr uint8_t ACEL_AXIS_NUMBER = 3;
+constexpr uint8_t GYRO_AXIS_NUMBER = 3;
+
 const uint8_t i2cAddress = IMU_ADDRESS;
 const uint16_t gyroFreq = 50;
 const uint16_t gyroFullScale = 250;
@@ -26,23 +29,30 @@ int main() {
         return -1;
     }
 
-    std::vector<uint8_t> gyroData;
-    if (imu.readGyroData(gyroData)) {
-        std::cout << "Gyro data read successfully" << std::endl;
-        imu.showGyroData(gyroData);
-    }
-    else {
-        std::cerr << "Failed to read gyro data" << std::endl;
+    while(1) {
+        std::vector<double> gyroData;
+        if (imu.readGyroData(gyroData)) {
+            imu.showGyroData(gyroData);
+        }
+        else {
+            std::cerr << "Reinitialisation" << std::endl;
+            IMU_init(i2cAddress, gyroFreq, gyroFullScale, accelFreq, accelFullScale, I2C_SDL, I2C_SDC, I2C_HZ);
+            imu.isInitialized();
+            imu.startAcquisition();
+        }
+
+        std::vector<double> accelData;
+        if (imu.readAccelData(accelData)) {
+            imu.showAccelData(accelData);
+        }
+        else {
+            std::cerr << "Reinitialisation" << std::endl;
+            IMU_init(i2cAddress, gyroFreq, gyroFullScale, accelFreq, accelFullScale, I2C_SDL, I2C_SDC, I2C_HZ);
+            imu.isInitialized();
+            imu.startAcquisition();
+        }
     }
 
-    std::vector<uint8_t> accelData;
-    if (imu.readAccelData(accelData)) {
-        std::cout << "Accel data read successfully" << std::endl;
-        imu.showAccelData(accelData);
-    }
-    else {
-        std::cerr << "Failed to read accel data" << std::endl;
-    }
 
     if (!imu.stopAcquisition()) {
         std::cerr << "Failed to stop acquisition" << std::endl;
@@ -88,15 +98,15 @@ bool Imu::setAccelRange(uint8_t accelRangeRegVal) {
     return IMU_set_accel_range(accelRangeRegVal);
 }
 
-bool Imu::readAccelData(std::vector<uint8_t>& accelData) {
-    accelData.resize(ACCEL_DATA_SIZE);
-    return IMU_read_accel_data(accelData.data());
+bool Imu::readAccelData(std::vector<double>& accelData) {
+    accelData.resize(ACEL_AXIS_NUMBER);
+    return IMU_read_accel_data(&accelData[0], &accelData[1], &accelData[2]);
 }
 
-void Imu::showAccelData(const std::vector<uint8_t>& accelData) {
+void Imu::showAccelData(const std::vector<double>& accelData) {
     std::cout << "Accel data: ";
     for (const auto& data : accelData) {
-        std::cout << static_cast<int>(data) << " ";
+        std::cout << data << " ";
     }
     std::cout << std::endl;
 }
@@ -109,15 +119,15 @@ bool Imu::setGyroRange(uint16_t gyroRangeRegVal) {
     return IMU_set_gyro_range(gyroRangeRegVal);
 }
 
-bool Imu::readGyroData(std::vector<uint8_t>& gyroData) {
-    gyroData.resize(GYRO_DATA_SIZE);
-    return IMU_read_gyro_data(gyroData.data());
+bool Imu::readGyroData(std::vector<double>& gyroData) {
+    gyroData.resize(GYRO_AXIS_NUMBER);
+    return IMU_read_gyro_data(&gyroData[0], &gyroData[1], &gyroData[2]);
 }
 
-void Imu::showGyroData(const std::vector<uint8_t>& gyroData) {
+void Imu::showGyroData(const std::vector<double>& gyroData) {
     std::cout << "Gyro data: ";
     for (const auto& data : gyroData) {
-        std::cout << static_cast<int>(data) << " ";
+        std::cout << data << " ";
     }
     std::cout << std::endl;
 }

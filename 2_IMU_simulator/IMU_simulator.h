@@ -16,8 +16,8 @@ extern "C"
 
     typedef struct
     {
-        float ax, ay, az;
-        float gx, gy, gz;
+        double ax, ay, az;
+        double gx, gy, gz;
     } imu_data_t;
 
     typedef struct
@@ -69,9 +69,9 @@ extern "C"
     void IMU_sim_set_data_ready(void);
     void IMU_sim_clear_is_data_ready(void);
     bool load_imu_data_from_csv(const char *filename);
-    void get_data_from_arr(uint32_t);
-    void convert_float_to_gyro_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte);
-    void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte);
+    void get_data_from_arr(uint8_t start_addr, uint32_t line_index);
+    void convert_double_to_gyro_reg_data(double value, uint8_t *high_byte, uint8_t *low_byte);
+    void convert_double_to_accel_reg_data(double value, uint8_t *high_byte, uint8_t *low_byte);
     void update_accel_data();
     void update_gyro_data();
     bool handle_read_register(uint8_t reg_addr, uint8_t *reg_val);

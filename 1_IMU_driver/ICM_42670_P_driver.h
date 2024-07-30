@@ -133,11 +133,13 @@ extern "C"
     bool IMU_set_gyro_freq(uint16_t gyro_freq);
     bool IMU_set_gyro_range(uint16_t gyro_range);
     bool IMU_set_gyro_mode(uint8_t gyro_mode_reg_val);
-    bool IMU_read_gyro_data(uint8_t *gyro_data);
+    // bool IMU_read_gyro_data(uint8_t *gyro_data);
+    bool IMU_read_gyro_data(double* gx, double* gy, double* gz);
     bool IMU_set_accel_freq(uint16_t accel_freq);
     bool IMU_set_accel_range(uint8_t accel_range);
     bool IMU_set_accel_mode(uint8_t accel_mode_reg_val);
-    bool IMU_read_accel_data(uint8_t *accel_data);
+    // bool IMU_read_accel_data(uint8_t* accel_data);
+    bool IMU_read_accel_data(double* ax, double* ay, double* az);
     bool IMU_read_data(uint8_t start_reg_addr, uint8_t* read_data, size_t length);
     bool IMU_is_data_ready(void);
     bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val);
