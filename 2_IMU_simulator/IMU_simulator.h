@@ -42,7 +42,7 @@ extern "C"
 
     typedef struct
     {
-        uint8_t address;
+        uint8_t address; 
         uint16_t gyro_freq;
         uint16_t gyro_range;
         bool gyro_on;
@@ -50,9 +50,8 @@ extern "C"
         uint8_t accel_range;
         bool accel_on;
         bool data_ready;
-        imu_data_t *data;
-        size_t data_length;
-        size_t current_index;
+        imu_data_t* data;
+        size_t data_lines_number;
         imu_registers_t reg;
     } imu_simul_t;
 

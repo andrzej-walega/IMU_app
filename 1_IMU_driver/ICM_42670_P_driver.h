@@ -108,14 +108,16 @@ extern "C"
 #define MAX_ACCEL_MODE_WAIT_TIME_MSEC 1UL
 
 #define I2C_BUF_SIZE 255
+#define ACCEL_DATA_SIZE 6 /* 16-bit x y z */
+#define GYRO_DATA_SIZE 6
 
     typedef struct
     {
         uint8_t address;
-        uint8_t gyro_freq;
-        uint8_t gyro_range;
+        uint16_t gyro_freq;
+        uint16_t gyro_range;
         uint8_t gyro_mode;
-        uint8_t accel_freq;
+        uint16_t accel_freq;
         uint8_t accel_range;
         uint8_t accel_mode;
         uint8_t accel_LP_clk;
@@ -128,19 +130,19 @@ extern "C"
         uint8_t i2c_sdl, uint8_t i2c_sdc, uint8_t i2c_hz);
     bool IMU_start_acquisition(void);
     bool IMU_stop_acquisition(void);
-    bool IMU_set_gyro_freq(uint16_t gyro_freq_reg_val);
-    bool IMU_set_gyro_range(uint8_t gyro_range_reg_val);
+    bool IMU_set_gyro_freq(uint16_t gyro_freq);
+    bool IMU_set_gyro_range(uint16_t gyro_range);
     bool IMU_set_gyro_mode(uint8_t gyro_mode_reg_val);
     bool IMU_read_gyro_data(uint8_t *gyro_data);
-    bool IMU_set_accel_freq(uint8_t accel_freq_reg_val);
-    bool IMU_set_accel_range(uint8_t accel_range_reg_val);
+    bool IMU_set_accel_freq(uint16_t accel_freq);
+    bool IMU_set_accel_range(uint8_t accel_range);
     bool IMU_set_accel_mode(uint8_t accel_mode_reg_val);
-    bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val);
     bool IMU_read_accel_data(uint8_t *accel_data);
-    bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data);
+    bool IMU_read_data(uint8_t start_reg_addr, uint8_t* read_data, size_t length);
+    bool IMU_is_data_ready(void);
+    bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val);
     bool IMU_set_idle(uint8_t idle_val);
     bool IMU_is_idle(void);
-    bool IMU_is_data_ready(void);
 
 #ifdef __cplusplus
 }

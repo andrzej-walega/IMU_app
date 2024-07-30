@@ -26,6 +26,7 @@ static bool time_elapsed(clock_t timeout_msec)
 bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t accel_freq, uint8_t accel_range,
     uint8_t i2c_sdl, uint8_t i2c_sdc, uint8_t i2c_hz)
 {
+    bool is_init_ok = true;
     imu.address = address;
     imu.gyro_freq = gyro_freq;
     imu.gyro_range = gyro_range;
@@ -37,7 +38,12 @@ bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t ac
     imu.idle = 0;
     imu.acquisition_started = false;
     imu.data_ready = false;
-    return i2c_init(i2c_sdl, i2c_sdc, i2c_hz);
+    is_init_ok &= i2c_init(i2c_sdl, i2c_sdc, i2c_hz);
+    is_init_ok &= IMU_set_gyro_freq(gyro_freq);
+    is_init_ok &= IMU_set_gyro_range(gyro_range);
+    is_init_ok &= IMU_set_accel_freq(accel_freq);
+    is_init_ok &= IMU_set_accel_range(accel_range);
+    return is_init_ok;
 }
 
 bool IMU_start_acquisition(void)
@@ -68,69 +74,161 @@ bool IMU_stop_acquisition(void)
     return true;
 }
 
-bool IMU_set_gyro_freq(uint16_t gyro_freq_reg_val)
+bool IMU_set_gyro_freq(uint16_t gyro_freq)
 {
+    uint16_t gyro_freq_reg_val = 0;
     bool status = false;
 
-    if (gyro_freq_reg_val > GYRO_ODR_12_5HZ)
+    switch (gyro_freq)
     {
+    case 1600:
+        gyro_freq_reg_val = GYRO_ODR_1600HZ;
+        break;
+    case 800:
+        gyro_freq_reg_val = GYRO_ODR_800HZ;
+        break;
+    case 400:
+        gyro_freq_reg_val = GYRO_ODR_400HZ;
+        break;
+    case 200:
+        gyro_freq_reg_val = GYRO_ODR_200HZ;
+        break;
+    case 100:
+        gyro_freq_reg_val = GYRO_ODR_100HZ;
+        break;
+    case 50:
+        gyro_freq_reg_val = GYRO_ODR_50HZ;
+        break;
+    case 25:
+        gyro_freq_reg_val = GYRO_ODR_25HZ;
+        break;
+    case 12:
+        gyro_freq_reg_val = GYRO_ODR_12_5HZ;
+        break;
+    default:
         return false;
     }
 
     if (IMU_send_I2C_reg_setting(GYRO_CONFIG0, GYRO_ODR_MASK, GYRO_ODR_POS, gyro_freq_reg_val))
     {
-        imu.gyro_freq = gyro_freq_reg_val;
+        imu.gyro_freq = gyro_freq;
         status = true;
     }
     return status;
 }
 
-bool IMU_set_accel_freq(uint8_t accel_freq_reg_val)
+bool IMU_set_accel_freq(uint16_t accel_freq)
 {
+    uint16_t accel_freq_reg_val = 0;
     bool status = false;
 
-    if (accel_freq_reg_val > ACCEL_ODR_1_5625HZ || accel_freq_reg_val < ACCEL_ODR_1600HZ)
+    switch (accel_freq)
     {
+    case 1600:
+        accel_freq_reg_val = ACCEL_ODR_1600HZ;
+        break;
+    case 800:
+        accel_freq_reg_val = ACCEL_ODR_800HZ;
+        break;
+    case 400:
+        accel_freq_reg_val = ACCEL_ODR_400HZ;
+        break;
+    case 200:
+        accel_freq_reg_val = ACCEL_ODR_200HZ;
+        break;
+    case 100:
+        accel_freq_reg_val = ACCEL_ODR_100HZ;
+        break;
+    case 50:
+        accel_freq_reg_val = ACCEL_ODR_50HZ;
+        break;
+    case 25:
+        accel_freq_reg_val = ACCEL_ODR_25HZ;
+        break;
+    case 12:
+        accel_freq_reg_val = ACCEL_ODR_12_5HZ;
+        break;
+    case 6:
+        accel_freq_reg_val = ACCEL_ODR_6_25HZ;
+        break;
+    case 3:
+        accel_freq_reg_val = ACCEL_ODR_3_125HZ;
+        break;
+    case 2:
+        accel_freq_reg_val = ACCEL_ODR_1_5625HZ;
+        break;
+    default:
         return false;
     }
 
     if (IMU_send_I2C_reg_setting(ACCEL_CONFIG0, ACCEL_ODR_MASK, ACCEL_ODR_POS, accel_freq_reg_val))
     {
-        imu.accel_freq = accel_freq_reg_val;
+        imu.accel_freq = accel_freq;
         status = true;
     }
     return status;
 }
 
-bool IMU_set_gyro_range(uint8_t gyro_range_reg_val)
+bool IMU_set_gyro_range(uint16_t gyro_range)
 {
+    uint16_t gyro_range_reg_val = 0;
     bool status = false;
 
-    if (gyro_range_reg_val > GYRO_UI_FS_SEL_250DPS)
+    switch (gyro_range)
     {
+    case 2000:
+        gyro_range_reg_val = GYRO_UI_FS_SEL_2000DPS;
+        break;
+    case 1000:
+        gyro_range_reg_val = GYRO_UI_FS_SEL_1000DPS;
+        break;
+    case 500:
+        gyro_range_reg_val = GYRO_UI_FS_SEL_500DPS;
+        break;
+    case 250:
+        gyro_range_reg_val = GYRO_UI_FS_SEL_250DPS;
+        break;
+    default:
         return false;
     }
+    return true;
+
 
     if (IMU_send_I2C_reg_setting(GYRO_CONFIG0, GYRO_UI_FS_SEL_MASK, GYRO_UI_FS_SEL_POS, gyro_range_reg_val))
     {
-        imu.gyro_range = gyro_range_reg_val;
+        imu.gyro_range = gyro_range;
         status = true;
     }
     return status;
 }
 
-bool IMU_set_accel_range(uint8_t accel_range_reg_val)
+bool IMU_set_accel_range(uint8_t accel_range)
 {
+    uint8_t accel_range_reg_val = 0;
     bool status = false;
 
-    if (accel_range_reg_val > ACCEL_UI_FS_SEL_2G)
+    switch (accel_range)
     {
+    case 2:
+        accel_range_reg_val = ACCEL_UI_FS_SEL_2G;
+        break;
+    case 4:
+        accel_range_reg_val = ACCEL_UI_FS_SEL_4G;
+        break;
+    case 8:
+        accel_range_reg_val = ACCEL_UI_FS_SEL_8G;
+        break;
+    case 16:
+        accel_range_reg_val = ACCEL_UI_FS_SEL_16G;
+        break;
+    default:
         return false;
     }
+    return true;
 
     if (IMU_send_I2C_reg_setting(ACCEL_CONFIG0, ACCEL_UI_FS_SEL_MASK, ACCEL_UI_FS_SEL_POS, accel_range_reg_val))
     {
-        imu.accel_range = accel_range_reg_val;
+        imu.accel_range = accel_range;
         status = true;
     }
     return status;
@@ -179,17 +277,16 @@ bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val)
 
 bool IMU_read_gyro_data(uint8_t *gyro_data)
 {
-    return IMU_read_data(GYRO_DATA_X1, gyro_data);
+    return IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE);
 }
 
 bool IMU_read_accel_data(uint8_t *accel_data)
 {
-    return IMU_read_data(ACCEL_DATA_X1, accel_data);
+    return IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE);
 }
 
-bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
+bool IMU_read_data(uint8_t start_reg_addr, uint8_t* read_data, size_t length)
 {
-    uint8_t reading_bytes = 6; // 16-bit x y z
     uint8_t reg_address = start_reg_addr;
 
     if (!imu.acquisition_started)
@@ -197,7 +294,7 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         return false;
     }
 
-    while (reading_bytes != 0)
+    while (length != 0)
     {
         start_timer();
         while (!IMU_is_data_ready()) // wait for data (INT_STATUS_DRDY)
@@ -216,7 +313,7 @@ bool IMU_read_data(uint8_t start_reg_addr, uint8_t *read_data)
         // printf("read_data reg_address, read_data, reading_bytes %d %d %d\n", reg_address, *read_data, reading_bytes);
         reg_address++;
         read_data++;
-        reading_bytes--;
+        length--;
     }
     return true;
 }
