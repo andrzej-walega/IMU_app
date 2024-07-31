@@ -4,6 +4,9 @@
 #include <vector>
 #include "../1_IMU_driver/ICM_42670_P_driver.h"
 
+constexpr uint8_t ACCEL_AXIS_NUMBER = 3;
+constexpr uint8_t GYRO_AXIS_NUMBER = 3;
+
 class Imu {
 
 public:
@@ -19,11 +22,16 @@ public:
     bool setAccelRange(uint8_t accelRangeRegVal);
     bool readAccelData(std::vector<double>& accelData);
     void showAccelData(const std::vector<double>& accelData);
+    void getAccelData(std::vector<double>& accelData);
 
     bool setGyroFreq(uint16_t gyroFreqRegVal);
     bool setGyroRange(uint16_t gyroRangeRegVal);
     bool readGyroData(std::vector<double>& gyroData);
     void showGyroData(const std::vector<double>& gyroData);
+    void getGyroData(std::vector<double>& gyroData);
+
+    void setNewDataReady(bool dataReady);
+    bool isNewDataReady();
 
 private:
     uint8_t address_;

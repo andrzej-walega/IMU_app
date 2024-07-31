@@ -272,6 +272,7 @@ bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val)
     return status;
 }
 
+// retval bool true: new data loaded 
 bool IMU_read_gyro_data(double* gx, double* gy, double* gz)
 {
     uint8_t gyro_data[GYRO_DATA_SIZE];
@@ -313,7 +314,7 @@ bool IMU_read_gyro_data(double* gx, double* gy, double* gz)
     return true;
 }
 
-
+// retval bool true: new data loaded 
 bool IMU_read_accel_data(double* ax, double* ay, double* az)
 {
     uint8_t accel_data[ACCEL_DATA_SIZE];
@@ -367,16 +368,6 @@ bool IMU_data_update()
         return false;
     }
 
-    // start_timer();
-    // while (!IMU_is_data_ready()) // wait for data (INT_STATUS_DRDY)
-    // {
-    //     if (time_elapsed(MAX_I2C_WAIT_TIME_MSEC))
-    //     {
-    //         printf("IMU: Communication broken, IMU need to be reset!\n");
-    //         return false;
-    //     }
-    // }
-
     if (IMU_is_data_ready()) {
         while (length != 0)
         {
@@ -384,7 +375,9 @@ bool IMU_data_update()
             {
                 return false;
             }
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
             // printf("read_data reg_address, read_data %d %d\n", reg_address, *read_byte);
+#endif
             reg_address++;
             read_byte++;
             length--;
