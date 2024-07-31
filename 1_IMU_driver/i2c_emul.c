@@ -19,6 +19,7 @@ static bool send_command(const uint8_t reg_addr, uint8_t* send_reg_val);
 static bool get_and_process_response(uint8_t* rcv_reg_val);
 static bool process_response(uint8_t* rcv_reg_val);
 
+static int fd;
 void ignore_sigpipe() {
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
@@ -113,7 +114,7 @@ static bool get_and_process_response(uint8_t* rcv_reg_val)
     fds.events = POLLIN;
 
     // Poll for data with a timeout
-    int ret = poll(&fds, 1, GET_RESPONSE_TIMEOUT);
+    int ret = poll(&fds, 1, RESPONSE_TIMEOUT_MS);
     if (ret == -1) {
         perror("poll error");
         is_cmd_to_repeat = true;
@@ -128,8 +129,6 @@ static bool get_and_process_response(uint8_t* rcv_reg_val)
         close(fd);
         return false;
     }
-    is_cmd_to_repeat = false;
-    // If poll is successful, read from the pipe
     ssize_t bytesRead = read(fd, response, I2C_BUF_SIZE - 1);
     if (bytesRead > 0) {
         response[bytesRead] = '\0'; // Terminate the string
@@ -140,7 +139,9 @@ static bool get_and_process_response(uint8_t* rcv_reg_val)
     }
     else if (bytesRead == -1) {
         is_cmd_to_repeat = true;
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
         perror("read error");
+#endif
     }
 
     close(fd);

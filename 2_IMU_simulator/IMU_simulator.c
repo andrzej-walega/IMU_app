@@ -155,7 +155,6 @@ void convert_double_to_accel_reg_data(double value, uint8_t* high_byte, uint8_t*
     case 4:
         scaling_factor = 8192.0;
         break;
-
     case 8:
         scaling_factor = 4096.0;
         break;
@@ -210,14 +209,17 @@ void update_accel_data(void)
 
     if (imu.accel_on)
     {
-        clock_t current_time = clock();
         if (imu.accel_freq == 0) {
             perror("Accelerator frequency is not set!");
             return;
         }
-        if (current_time - start_accel_time >= 1000 / imu.accel_freq) //[ms/Hz]
+        clock_t current_time = clock();
+        if (current_time - start_accel_time >= CLOCKS_PER_SEC / imu.accel_freq) //[ms/Hz]
         {
-            start_accel_time = current_time;
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
+            // printf("accel time: %ld\n", current_time);
+#endif
+            start_accel_time += CLOCKS_PER_SEC / imu.accel_freq;
             get_data_from_arr(ACCEL_DATA_X1, accel_line_index);
             IMU_sim_set_data_ready();
         }
@@ -239,14 +241,14 @@ void update_gyro_data(void)
 
     if (imu.gyro_on)
     {
-        clock_t current_time = clock();
         if (imu.gyro_freq == 0) {
             perror("Gyroscope frequency is not set!");
             return;
         }
-        if (current_time - start_gyro_time >= 1000 / imu.gyro_freq) //[ms/Hz]
+        clock_t current_time = clock();
+        if (current_time - start_gyro_time >= CLOCKS_PER_SEC / imu.gyro_freq) //[ms/Hz]
         {
-            start_gyro_time = current_time;
+            start_gyro_time += CLOCKS_PER_SEC / imu.accel_freq;
             get_data_from_arr(GYRO_DATA_X1, gyro_line_index);
             IMU_sim_set_data_ready();
         }
@@ -554,30 +556,11 @@ void IMU_sim_clear_is_data_ready()
 }
 
 bool read_and_answer_command() {
-    // Read from the internal pipe
-    int fd = open(PIPE_CMD_NAME, O_RDONLY | O_NONBLOCK);
+
+    int fd = open(PIPE_CMD_NAME, O_RDONLY);
     if (fd == -1)
     {
         perror("open response pipe");
-        return false;
-    }
-
-    struct pollfd fds;
-    fds.fd = fd;
-    fds.events = POLLIN;
-
-    // Poll for data with a timeout
-    int ret = poll(&fds, 1, GET_RESPONSE_TIMEOUT);
-    if (ret == -1) {
-        perror("poll error");
-        close(fd);
-        return false;
-    }
-    else if (ret == 0) {
-#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
-        fprintf(stderr, "poll timeout\n");
-#endif
-        close(fd);
         return false;
     }
 
@@ -623,7 +606,7 @@ void process_command()
         unsigned int reg_addr;
         sscanf(cmd_buffer + 7, "%02X", &reg_addr);
 #if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
-        printf("Processing read command: RA=%02X\n", reg_addr);
+        // printf("Processing read command: RA=%02X\n", reg_addr);
 #endif
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
         uint8_t reg_val;

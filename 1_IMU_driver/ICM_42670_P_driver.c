@@ -10,20 +10,20 @@ static clock_t start_time;
 
 static void start_timer()
 {
-    start_time = clock();
+    start_time = clock() / (CLOCKS_PER_SEC / 1000);
 }
 
 static bool time_elapsed(clock_t timeout_msec)
 {
-    clock_t current_time = clock();
+    clock_t current_time = clock() / (CLOCKS_PER_SEC / 1000);
     clock_t elapsed_time = (current_time - start_time);
-    return elapsed_time > timeout_msec;
+    return elapsed_time >= timeout_msec;
 }
 
 // Function implementations
 
 //retval bool: communication ok, returned data is valid
-bool IMU_init(uint8_t address, uint8_t gyro_freq, uint8_t gyro_range, uint8_t accel_freq, uint8_t accel_range,
+bool IMU_init(uint8_t address, uint16_t gyro_freq, uint16_t gyro_range, uint16_t accel_freq, uint8_t accel_range,
     uint8_t i2c_sdl, uint8_t i2c_sdc, uint8_t i2c_hz)
 {
     bool is_init_ok = true;
@@ -171,7 +171,7 @@ bool IMU_set_accel_freq(uint16_t accel_freq)
 
 bool IMU_set_gyro_range(uint16_t gyro_range)
 {
-    uint16_t gyro_range_reg_val = 0;
+    uint8_t gyro_range_reg_val = 0;
     bool status = false;
 
     switch (gyro_range)
@@ -191,8 +191,6 @@ bool IMU_set_gyro_range(uint16_t gyro_range)
     default:
         return false;
     }
-    return true;
-
 
     if (IMU_send_I2C_reg_setting(GYRO_CONFIG0, GYRO_UI_FS_SEL_MASK, GYRO_UI_FS_SEL_POS, gyro_range_reg_val))
     {
@@ -224,7 +222,6 @@ bool IMU_set_accel_range(uint8_t accel_range)
     default:
         return false;
     }
-    return true;
 
     if (IMU_send_I2C_reg_setting(ACCEL_CONFIG0, ACCEL_UI_FS_SEL_MASK, ACCEL_UI_FS_SEL_POS, accel_range_reg_val))
     {
@@ -275,22 +272,16 @@ bool IMU_set_accel_LP_clk(uint8_t accel_LP_clk_reg_val)
     return status;
 }
 
-// bool IMU_read_gyro_data(uint8_t *gyro_data)
-// {
-//     return IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE);
-// }
-
-// bool IMU_read_accel_data(uint8_t *accel_data)
-// {
-//     return IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE);
-// }
-
 bool IMU_read_gyro_data(double* gx, double* gy, double* gz)
 {
     uint8_t gyro_data[GYRO_DATA_SIZE];
 
-    if (!IMU_read_data(GYRO_DATA_X1, gyro_data, GYRO_DATA_SIZE)) {
+    if (!IMU_data_update()) {
         return false;
+    }
+
+    for (int i = 0; i < GYRO_DATA_SIZE; i++) {
+        gyro_data[i] = imu.data[ACCEL_DATA_SIZE + i];
     }
 
     int16_t x_raw = (gyro_data[0] << 8) | gyro_data[1];
@@ -327,8 +318,12 @@ bool IMU_read_accel_data(double* ax, double* ay, double* az)
 {
     uint8_t accel_data[ACCEL_DATA_SIZE];
 
-    if (!IMU_read_data(ACCEL_DATA_X1, accel_data, ACCEL_DATA_SIZE)) {
+    if (!IMU_data_update()) {
         return false;
+    }
+
+    for (int i = 0; i < ACCEL_DATA_SIZE; i++) {
+        accel_data[i] = imu.data[i];
     }
 
     int16_t x_raw = (accel_data[0] << 8) | accel_data[1];
@@ -361,35 +356,39 @@ bool IMU_read_accel_data(double* ax, double* ay, double* az)
 }
 
 
-bool IMU_read_data(uint8_t start_reg_addr, uint8_t* read_data, size_t length)
+bool IMU_data_update()
 {
-    uint8_t reg_address = start_reg_addr;
+    uint8_t length = DATA_SIZE;
+    uint8_t reg_address = ACCEL_DATA_X1;
+    uint8_t* read_byte = imu.data;
 
     if (!imu.acquisition_started)
     {
         return false;
     }
 
-    while (length != 0)
-    {
-        start_timer();
-        while (!IMU_is_data_ready()) // wait for data (INT_STATUS_DRDY)
+    // start_timer();
+    // while (!IMU_is_data_ready()) // wait for data (INT_STATUS_DRDY)
+    // {
+    //     if (time_elapsed(MAX_I2C_WAIT_TIME_MSEC))
+    //     {
+    //         printf("IMU: Communication broken, IMU need to be reset!\n");
+    //         return false;
+    //     }
+    // }
+
+    if (IMU_is_data_ready()) {
+        while (length != 0)
         {
-            if (time_elapsed(MAX_I2C_WAIT_TIME_MSEC))
+            if (!i2c_read_data(reg_address, read_byte))
             {
-                printf("IMU: Communication broken, IMU need to be reset!\n");
                 return false;
             }
+            // printf("read_data reg_address, read_data %d %d\n", reg_address, *read_byte);
+            reg_address++;
+            read_byte++;
+            length--;
         }
-
-        if (!i2c_read_data(reg_address, read_data))
-        {
-            return false;
-        }
-        // printf("read_data reg_address, read_data, reading_bytes %d %d %d\n", reg_address, *read_data, reading_bytes);
-        reg_address++;
-        read_data++;
-        length--;
     }
     return true;
 }
