@@ -83,13 +83,17 @@ static bool send_command(const uint8_t reg_addr, uint8_t* send_reg_val) {
     ssize_t bytes_written = write(fd_cmd, write_command, strlen(write_command) + 1);
     if (bytes_written == -1) {
         if (errno == EPIPE) {
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
             fprintf(stderr, "Broken pipe: Reader process is not available\n");
+#endif
         }
         else {
             perror("write");
         }
     }
+#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
     printf(" ...ok\n");
+#endif
     close(fd_cmd);
     return true;
 }
@@ -109,7 +113,7 @@ static bool get_and_process_response(uint8_t* rcv_reg_val)
     fds.events = POLLIN;
 
     // Poll for data with a timeout
-    int ret = poll(&fds, 1, GET_RESP_TIMEOUT);
+    int ret = poll(&fds, 1, GET_RESPONSE_TIMEOUT);
     if (ret == -1) {
         perror("poll error");
         is_cmd_to_repeat = true;

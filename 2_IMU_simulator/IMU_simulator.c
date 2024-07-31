@@ -21,6 +21,7 @@ static bool is_new_resp_data = false;
 static char cmd_buffer[I2C_BUF_SIZE];
 static char resp_buffer[I2C_BUF_SIZE];
 
+// set default reset values of ICM-42670-P
 static void imu_init() {
     imu.reg.accel_data_x1 = 0x80;
     imu.reg.accel_data_x0 = 0x00;
@@ -38,6 +39,15 @@ static void imu_init() {
     imu.reg.gyro_config0 = 0x06;
     imu.reg.accel_config0 = 0x06;
     imu.reg.int_status_drdy = 0x00;
+    imu.gyro_freq = 800;
+    imu.gyro_range = 2000;
+    imu.gyro_on = false;
+    imu.accel_freq = 800;
+    imu.accel_range = 16;
+    imu.accel_on = false;
+    imu.data_ready = false;
+    imu.data = NULL;
+    imu.data_lines_number = 0;
 }
 
 int main(int argc, char const* argv[])
@@ -57,6 +67,7 @@ int main(int argc, char const* argv[])
         update_gyro_data();
         read_and_answer_command();
     }
+    free(imu.data);
     return 0;
 }
 
@@ -79,68 +90,77 @@ bool load_imu_data_from_csv(const char *filename)
     rewind(file); // Reset file pointer to the beginning
 
     // Allocate memory for the IMU data
-    imu.data = (imu_data_t *)malloc(sizeof(imu_data_t) * line_count);
+    imu.data = (imu_data_t*)malloc(sizeof(imu_data_t) * line_count);
     if (imu.data == NULL)
     {
         perror("Failed to allocate memory");
         fclose(file);
         exit(EXIT_FAILURE);
     }
-    imu.data_length = line_count;
-    imu.current_index = 0;
+    imu.data_lines_number = line_count;
 
     // Read the data into the imu.data
     fgets(line, sizeof(line), file); // Skip the header line
     size_t index = 0;
     while (fgets(line, sizeof(line), file))
     {
-        sscanf(line, "%f,%f,%f,%f,%f,%f",
+        sscanf(line, "%lf,%lf,%lf,%lf,%lf,%lf",
                &imu.data[index].ax, &imu.data[index].ay, &imu.data[index].az,
                &imu.data[index].gx, &imu.data[index].gy, &imu.data[index].gz);
         index++;
     }
-    index--;
-    // printf("%f, %f, %f, %f, %f, %f \n",
+    // index--;
+    // printf("%lf, %lf, %lf, %lf, %lf, %lf\n",
     //        imu.data[index].ax, imu.data[index].ay, imu.data[index].az,
     //        imu.data[index].gx, imu.data[index].gy, imu.data[index].gz);
 
     fclose(file);
-    free(imu.data);
     return true;
 }
 
-void get_data_from_arr(uint32_t line_index)
+void get_data_from_arr(uint8_t start_addr, uint32_t line_index)
 {
     uint8_t axis_number = 3; // x, y, z
-    uint8_t *reg_data = &imu.reg.accel_data_x0;
-    float *arr_data = &imu.data[line_index].ax;
-
+    double* arr_data = NULL;
+    uint8_t* reg_data = NULL;
+    if (start_addr == ACCEL_DATA_X1) {
+        arr_data = &imu.data[line_index].ax;
+        reg_data = &imu.reg.accel_data_x1;
+    }
+    else if (start_addr == GYRO_DATA_X1){
+        arr_data = &imu.data[line_index].gx;
+        reg_data = &imu.reg.gyro_data_x1;
+    }
     for (uint8_t i = 0; i < axis_number; i++)
     {
-        convert_float_to_accel_reg_data(*arr_data, reg_data+1, reg_data);
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
+        printf("arr_data[%d]: %f\n", i, *arr_data);
+#endif
+        convert_double_to_accel_reg_data(*arr_data, reg_data, reg_data + 1);
         reg_data += 2;
         arr_data++;
     }
 }
 
-void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte)
+void convert_double_to_accel_reg_data(double value, uint8_t* high_byte, uint8_t* low_byte)
 {
     int16_t scaled_value;
-    float scaling_factor;
+    double scaling_factor;
 
     switch (imu.accel_range)
     {
     case 2:
-        scaling_factor = 8192.0; // 2^13 / 2G
+        scaling_factor = 16384.0; // 2^15 / 2G
         break;
     case 4:
+        scaling_factor = 8192.0;
+        break;
+
+    case 8:
         scaling_factor = 4096.0;
         break;
-    case 8:
-        scaling_factor = 2048.0;
-        break;
     case 16:
-        scaling_factor = 1024.0;
+        scaling_factor = 2048.0;
         break;
     default:
         *high_byte = 0x80;
@@ -153,15 +173,15 @@ void convert_float_to_accel_reg_data(float value, uint8_t *high_byte, uint8_t *l
     *low_byte = scaled_value & 0xFF;
 }
 
-void convert_float_to_gyro_reg_data(float value, uint8_t *high_byte, uint8_t *low_byte)
+void convert_double_to_gyro_reg_data(double value, uint8_t *high_byte, uint8_t *low_byte)
 {
     int16_t scaled_value;
-    float scaling_factor;
+    double scaling_factor;
 
     switch (imu.gyro_range)
     {
     case 250:
-        scaling_factor = 131.0; // 2^15 / 250DPS
+        scaling_factor = 131.1; // 2^15 / 250DPS
         break;
     case 500:
         scaling_factor = 65.5;
@@ -191,14 +211,18 @@ void update_accel_data(void)
     if (imu.accel_on)
     {
         clock_t current_time = clock();
-        if (current_time - start_accel_time >= 1000/imu.accel_freq) //[ms/Hz]
+        if (imu.accel_freq == 0) {
+            perror("Accelerator frequency is not set!");
+            return;
+        }
+        if (current_time - start_accel_time >= 1000 / imu.accel_freq) //[ms/Hz]
         {
             start_accel_time = current_time;
-            get_data_from_arr(accel_line_index);
+            get_data_from_arr(ACCEL_DATA_X1, accel_line_index);
             IMU_sim_set_data_ready();
         }
     }
-    if (accel_line_index >= imu.data_length - 1)
+    if (accel_line_index >= imu.data_lines_number - 1)
     {
         accel_line_index = 0;
     }
@@ -216,14 +240,18 @@ void update_gyro_data(void)
     if (imu.gyro_on)
     {
         clock_t current_time = clock();
+        if (imu.gyro_freq == 0) {
+            perror("Gyroscope frequency is not set!");
+            return;
+        }
         if (current_time - start_gyro_time >= 1000 / imu.gyro_freq) //[ms/Hz]
         {
             start_gyro_time = current_time;
-            get_data_from_arr(gyro_line_index);
+            get_data_from_arr(GYRO_DATA_X1, gyro_line_index);
             IMU_sim_set_data_ready();
         }
     }
-    if (gyro_line_index >= imu.data_length - 1)
+    if (gyro_line_index >= imu.data_lines_number - 1)
     {
         gyro_line_index = 0;
     }
@@ -539,14 +567,14 @@ bool read_and_answer_command() {
     fds.events = POLLIN;
 
     // Poll for data with a timeout
-    int ret = poll(&fds, 1, GET_RESP_TIMEOUT);
+    int ret = poll(&fds, 1, GET_RESPONSE_TIMEOUT);
     if (ret == -1) {
         perror("poll error");
         close(fd);
         return false;
     }
     else if (ret == 0) {
-#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
         fprintf(stderr, "poll timeout\n");
 #endif
         close(fd);
@@ -557,7 +585,7 @@ bool read_and_answer_command() {
     if (bytesRead > 0)
     {
         cmd_buffer[bytesRead] = '\0'; // terminate the string
-#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
         printf("Received command: %s\n", cmd_buffer);
 #endif
         process_command();
@@ -576,7 +604,7 @@ void process_command()
     {
         unsigned int reg_addr, reg_val;
         sscanf(cmd_buffer + 8, "%02X,%02X", &reg_addr, &reg_val);
-#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
         printf("Processing write command: RA=%02X, reg_val=%02X\n", reg_addr, reg_val);
 #endif
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
@@ -594,7 +622,7 @@ void process_command()
     {
         unsigned int reg_addr;
         sscanf(cmd_buffer + 7, "%02X", &reg_addr);
-#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
         printf("Processing read command: RA=%02X\n", reg_addr);
 #endif
         uint8_t reg_addr_u8 = (uint8_t)reg_addr;
@@ -633,7 +661,7 @@ bool send_response()
         }
     }
     close(fd);
-#if (I2C_EMUL_SHOW_COMMUNICATION == 1)
+#if (IMU_SIMUL_SHOW_COMMUNICATION == 1)
     printf("Response sent: %s\n", resp_buffer);
 #endif
     return true;
