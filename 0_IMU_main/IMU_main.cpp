@@ -7,16 +7,16 @@ constexpr uint8_t GYRO_AXIS_NUMBER = 3;
 
 const uint8_t i2cAddress = IMU_ADDRESS;
 const uint16_t gyroFreq = 50;
-const uint16_t gyroFullScale = 250;
+const uint16_t gyroScale = 250;
 const uint16_t accelFreq = 50;
-const uint8_t accelFullScale = 2;
+const uint8_t accelScale = 2;
 const uint8_t I2C_SDL = 0;
 const uint8_t I2C_SDC = 0;
 const uint8_t I2C_HZ = 0;
 
 int main() {
 
-    Imu imu(i2cAddress, gyroFreq, gyroFullScale, accelFreq, accelFullScale, I2C_SDL, I2C_SDC, I2C_HZ);
+    Imu imu(i2cAddress, gyroFreq, gyroScale, accelFreq, accelScale, I2C_SDL, I2C_SDC, I2C_HZ);
 
     // Check if the IMU was initialized successfully
     if (!imu.isInitialized()) {
@@ -29,28 +29,17 @@ int main() {
         return -1;
     }
 
-    while(1) {
+    while (1) {
         std::vector<double> gyroData;
         if (imu.readGyroData(gyroData)) {
             imu.showGyroData(gyroData);
-        }
-        else {
-            std::cerr << "Reinitialisation" << std::endl;
-            IMU_init(i2cAddress, gyroFreq, gyroFullScale, accelFreq, accelFullScale, I2C_SDL, I2C_SDC, I2C_HZ);
-            imu.isInitialized();
-            imu.startAcquisition();
         }
 
         std::vector<double> accelData;
         if (imu.readAccelData(accelData)) {
             imu.showAccelData(accelData);
         }
-        else {
-            std::cerr << "Reinitialisation" << std::endl;
-            IMU_init(i2cAddress, gyroFreq, gyroFullScale, accelFreq, accelFullScale, I2C_SDL, I2C_SDC, I2C_HZ);
-            imu.isInitialized();
-            imu.startAcquisition();
-        }
+
     }
 
 

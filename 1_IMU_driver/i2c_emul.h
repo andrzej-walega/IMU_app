@@ -15,7 +15,7 @@ extern "C"
     
 #define I2C_EMUL_SHOW_COMMUNICATION 0 /* 1 => show*/
 #define IMU_SIMUL_SHOW_COMMUNICATION 1 /* 1 => show*/
-#define GET_RESPONSE_TIMEOUT 500 /* [ms] */
+#define RESPONSE_TIMEOUT_MS 5 /* [ms] */
 
 #define SLAVE_OK "S,OK"
 #define SLAVE_ERR "S,ERR"
